@@ -23,6 +23,11 @@ const DATABASE_URL =
 
 console.log("DATABASE_URL:", DATABASE_URL);
 
+app.get('/health', (req, res) => {
+  res.status(200).send('ok');
+});
+
+
 // === BANCO ===
 const pool = new Pool({
   connectionString: DATABASE_URL,
@@ -213,9 +218,7 @@ app.get("/events/:id", auth, async (req, res) => {
   res.json(q.rows);
 });
 
-const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('Servidor rodando na porta', PORT);
+  console.log('Utmify Hub running on port', PORT);
 });
 
