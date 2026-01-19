@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Painel — Utmify Hub</title>
+  <style>
+    body{font-family:Arial; background:#0b1220; color:#fff; margin:0}
+    .wrap{max-width:980px; margin:0 auto; padding:18px}
+    .top{display:flex; align-items:center; justify-content:space-between}
+    .card{background:#121b2f; border:1px solid #223055; border-radius:12px; padding:16px; margin:14px 0}
+    input,select{padding:10px; border-radius:10px; border:1px solid #2a3552; background:#0b1220; color:#fff; width:100%; box-sizing:border-box}
+    button{padding:10px 12px; border:0; border-radius:10px; background:#4f8cff; color:#fff; font-weight:bold; cursor:pointer}
+    .grid{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
+    .muted{color:#a9b4d0; font-size:13px}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    table{width:100%; border-collapse:collapse}
+    td,th{padding:10px; border-bottom:1px solid #223055; font-size:13px; text-align:left}
+    .bad{color:#ff7a7a}
+    .good{color:#6dffb1}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h2 style="margin:0">Utmify Hub</h2>
+        <div class="muted">Crie integrações e copie seu endpoint de webhook</div>
+      </div>
+      <div class="row">
+        <button onclick="logout()">Sair</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px">Criar integração</h3>
+      <div class="grid">
+        <div>
+          <div class="muted">Nome</div>
+          <input id="name" placeholder="ex: WayMB BRL" />
+        </div>
+        <div>
+          <div class="muted">Platform</div>
+          <input id="platform" placeholder="ex: WayMB" value="WayMB" />
+        </div>
+        <div>
+          <div class="muted">Moeda</div>
+          <select id="currency">
+            <option>BRL</option><option>USD</option><option>EUR</option><option>GBP</option>
+            <option>ARS</option><option>CAD</option><option>COP</option><option>MXN</option>
+            <option>PYG</option><option>CLP</option><option>PEN</option><option>PLN</option>
+          </select>
+        </div>
+        <div>
+          <div class="muted">Token Utmify (x-api-token)</div>
+          <input id="token" placeholder="cole aqui" />
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <button onclick="createIntegration()">Criar</button>
+        <span class="muted" id="msg" style="margin-left:10px"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px">Minhas integrações</h3>
+      <div id="list" class="muted">Carregando...</div>
+    </div>
+
+    <div class="card" id="logsCard" style="display:none">
+      <h3 style="margin:0 0 10px">Logs</h3>
+      <div class="muted" id="logsTitle"></div>
+      <div id="logs"></div>
+    </div>
+  </div>
+
+<script>
+function token(){
+  return localStorage.getItem("token") || "";
+}
+function authHeaders(){
+  return { "Authorization":"Bearer " + token(), "Content-Type":"application/json" };
+}
+function logout(){
+  localStorage.removeItem("token");
+  location.href = "/login.html";
+}
+if(!token()) location.href = "/login.html";
+
+function setMsg(t){ document.getElementById("msg").textContent = t || ""; }
+
+async function createIntegration(){
+  setMsg("");
+  const name = document.getElementById("name").value.trim();
+  const platform = document.getElementById("platform").value.trim() || "Custom";
+  const currency = document.getElementById("currency").value;
+  const utmify_token = document.getElementById("token").value.trim();
+  if(!name || !utmify_token) return setMsg("Preencha nome e token.");
+
+  const r = await fetch("/integrations",{
+    method:"POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ name, platform, currency, utmify_token })
+  });
+  const j = await r.json().catch(()=> ({}));
+  if(!r.ok) return setMsg(j.error || "Erro ao criar.");
+
+  setMsg("Integração criada!");
+  document.getElementById("token").value = "";
+  await loadIntegrations();
+}
+
+async function loadIntegrations(){
+  const r = await fetch("/integrations",{ headers: authHeaders() });
+  const list = await r.json().catch(()=> []);
+  if(!r.ok) {
+    document.getElementById("list").textContent = "Erro ao carregar.";
+    return;
+  }
+
+  if(!list.length){
+    document.getElementById("list").innerHTML = "<div class='muted'>Nenhuma integração ainda.</div>";
+    return;
+  }
+
+  const base = location.origin;
+
+  document.getElementById("list").innerHTML = list.map(it => {
+    const hookUrl = `${base}/hook/${it.id}`;
+    return `
+      <div class="card" style="margin:10px 0; border-color:#1d2a4c">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div style="font-weight:bold">${it.name || "Sem nome"}</div>
+            <div class="muted">Platform: ${it.platform || "Custom"} • Currency: ${it.currency || "BRL"}</div>
+          </div>
+          <div class="row">
+            <button onclick="copyText('${hookUrl}')">Copiar URL</button>
+            <button onclick="copyText('${it.hook_secret}')">Copiar Secret</button>
+            <button onclick="loadLogs('${it.id}','${(it.name||"").replace(/'/g,"") }')">Ver logs</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px" class="mono">
+          <div><span class="muted">Webhook URL:</span> ${hookUrl}</div>
+          <div><span class="muted">Header:</span> x-hook-secret: ${it.hook_secret}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function copyText(t){
+  await navigator.clipboard.writeText(t);
+  alert("Copiado!");
+}
+
+async function loadLogs(integrationId, name){
+  document.getElementById("logsCard").style.display = "block";
+  document.getElementById("logsTitle").textContent = `Integração: ${name}`;
+  document.getElementById("logs").innerHTML = "<div class='muted'>Carregando...</div>";
+
+  const r = await fetch(`/events/${integrationId}`, { headers: authHeaders() });
+  const rows = await r.json().catch(()=> []);
+  if(!r.ok) {
+    document.getElementById("logs").innerHTML = "<div class='bad'>Erro ao carregar logs.</div>";
+    return;
+  }
+
+  if(!rows.length){
+    document.getElementById("logs").innerHTML = "<div class='muted'>Sem eventos ainda.</div>";
+    return;
+  }
+
+  document.getElementById("logs").innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th><th>Status</th><th>HTTP</th><th>Erro</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(e => `
+          <tr>
+            <td>${new Date(e.received_at).toLocaleString()}</td>
+            <td class="${e.status === 'success' ? 'good' : 'bad'}">${e.status}</td>
+            <td>${e.utmify_status || ''}</td>
+            <td class="muted">${(e.error || '').slice(0,80)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+loadIntegrations();
+</script>
+</body>
+</html>

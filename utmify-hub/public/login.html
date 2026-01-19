@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login — Utmify Hub</title>
+  <style>
+    body{font-family:Arial; background:#0b1220; color:#fff; margin:0; display:flex; height:100vh; align-items:center; justify-content:center;}
+    .card{width:360px; background:#121b2f; padding:22px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.4)}
+    input{width:100%; padding:12px; border-radius:10px; border:1px solid #2a3552; background:#0b1220; color:#fff; margin:8px 0}
+    button{width:100%; padding:12px; border:0; border-radius:10px; background:#4f8cff; color:#fff; font-weight:bold; cursor:pointer}
+    .muted{color:#a9b4d0; font-size:13px}
+    .err{color:#ff7a7a; font-size:13px; min-height:18px}
+    a{color:#8fb5ff}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 style="margin:0 0 12px">Entrar</h2>
+    <div class="muted">Utmify Hub</div>
+
+    <div class="err" id="err"></div>
+
+    <input id="email" placeholder="email" />
+    <input id="password" placeholder="senha" type="password" />
+    <button id="btn">Entrar</button>
+
+    <p class="muted" style="margin-top:12px">
+      Não tem conta? <a href="#" id="register">Criar agora</a>
+    </p>
+  </div>
+
+<script>
+function setErr(t){ document.getElementById("err").textContent = t || ""; }
+
+async function login(isRegister=false){
+  setErr("");
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+  if(!email || !password) return setErr("Preencha email e senha.");
+
+  const url = isRegister ? "/auth/register" : "/auth/login";
+
+  const r = await fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({email,password})
+  });
+
+  const j = await r.json().catch(()=> ({}));
+
+  if(!r.ok){
+    return setErr(j.error || "Erro.");
+  }
+
+  if(isRegister){
+    return login(false);
+  }
+
+  localStorage.setItem("token", j.token);
+  location.href = "/painel.html";
+}
+
+document.getElementById("btn").onclick = () => login(false);
+document.getElementById("register").onclick = (e)=>{ e.preventDefault(); login(true); };
+</script>
+</body>
+</html>
